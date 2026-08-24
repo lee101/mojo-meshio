@@ -1,6 +1,5 @@
 """Numeric mesh kernels exposed through a C ABI."""
 
-from std.algorithm import parallelize
 from std.math import sqrt
 from std.sys.info import simd_width_of
 
@@ -251,8 +250,7 @@ def gather_triangles(points: FPtr, cells: IPtr, vertices: FPtr, count: Int):
 
     var chunk_count = (count + CHUNK_TRIANGLES - 1) // CHUNK_TRIANGLES
 
-    @parameter
-    def gather_chunk(chunk: Int):
+    for chunk in range(chunk_count):
         var triangle_start = chunk * CHUNK_TRIANGLES
         var triangle_stop = min(triangle_start + CHUNK_TRIANGLES, count)
         gather_triangle_vertices(
@@ -262,8 +260,6 @@ def gather_triangles(points: FPtr, cells: IPtr, vertices: FPtr, count: Int):
             triangle_start * 3,
             triangle_stop * 3,
         )
-
-    parallelize[gather_chunk](chunk_count)
 
 
 @export("mmi_parse_f64")

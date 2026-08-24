@@ -54,7 +54,12 @@ def lib() -> ctypes.CDLL:
 def ensure_parallel_runtime() -> None:
     global _parallel_runtime
     if _parallel_runtime is None:
-        runtime = lib().KGEN_CompilerRT_AsyncRT_GetOrCreateCPUDevice
+        runtime = getattr(
+            lib(), "KGEN_CompilerRT_AsyncRT_GetOrCreateCPUDevice", False
+        )
+        if not runtime:
+            _parallel_runtime = False
+            return
         runtime.argtypes = []
         runtime.restype = ctypes.c_void_p
         runtime()
