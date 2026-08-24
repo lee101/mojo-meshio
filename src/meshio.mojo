@@ -241,25 +241,7 @@ def gather_triangle_vertices(
 
 
 def gather_triangles(points: FPtr, cells: IPtr, vertices: FPtr, count: Int):
-    comptime PARALLEL_THRESHOLD = 16384
-    comptime CHUNK_TRIANGLES = 4096
-    var vertex_count = count * 3
-    if count < PARALLEL_THRESHOLD:
-        gather_triangle_vertices(points, cells, vertices, 0, vertex_count)
-        return
-
-    var chunk_count = (count + CHUNK_TRIANGLES - 1) // CHUNK_TRIANGLES
-
-    for chunk in range(chunk_count):
-        var triangle_start = chunk * CHUNK_TRIANGLES
-        var triangle_stop = min(triangle_start + CHUNK_TRIANGLES, count)
-        gather_triangle_vertices(
-            points,
-            cells,
-            vertices,
-            triangle_start * 3,
-            triangle_stop * 3,
-        )
+    gather_triangle_vertices(points, cells, vertices, 0, count * 3)
 
 
 @export("mmi_parse_f64")
@@ -318,4 +300,17 @@ def mmi_gather_triangles(
         IPtr(unsafe_from_address=cells),
         FPtr(unsafe_from_address=vertices),
         count,
+    )
+
+
+@export("mmi_gather_triangles_range")
+def mmi_gather_triangles_range(
+    points: Int, cells: Int, vertices: Int, start: Int, stop: Int
+) abi("C"):
+    gather_triangle_vertices(
+        FPtr(unsafe_from_address=points),
+        IPtr(unsafe_from_address=cells),
+        FPtr(unsafe_from_address=vertices),
+        start * 3,
+        stop * 3,
     )

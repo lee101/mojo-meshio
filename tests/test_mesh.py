@@ -137,6 +137,34 @@ def test_gather_triangles_simd_tail_and_parallel_threshold(triangle_count):
     assert np.array_equal(mm.gather_triangles(points, cells), points[cells])
 
 
+def test_gather_triangles_dispatches_only_at_parallel_threshold(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    import mojo_meshio._geometry as geometry
+
+    points = np.arange(45, dtype=np.float64).reshape(-1, 3)
+    cells = np.arange(15, dtype=np.int64).reshape(-1, 3)
+
+    monkeypatch.setattr(geometry, "_GATHER_PARALLEL_THRESHOLD", 5)
+    monkeypatch.setattr(geometry, "_GATHER_WORKERS", 2)
+    monkeypatch.setattr(
+        geometry,
+        "_executor",
+        lambda: (_ for _ in ()).throw(AssertionError("parallel dispatch below threshold")),
+    )
+    assert np.array_equal(mm.gather_triangles(points, cells[:4]), points[cells[:4]])
+
+    dispatches = []
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        monkeypatch.setattr(
+            geometry,
+            "_executor",
+            lambda: dispatches.append(True) or executor,
+        )
+        assert np.array_equal(mm.gather_triangles(points, cells), points[cells])
+    assert dispatches
+
+
 def test_mesh_write_method(tmp_path):
     path = tmp_path / "mesh.off"
     sample_mesh().write(path)

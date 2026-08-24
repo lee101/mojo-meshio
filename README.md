@@ -102,22 +102,29 @@ are tightly packed.
 
 ## Benchmarks
 
-Measured on 2026-07-29 with an Intel Xeon E5-2697 v4 at 2.30 GHz, Linux x86-64.
+Measured on 2026-08-24 with an Intel Xeon E5-2697 v4 at 2.30 GHz, Linux x86-64.
 Times are the best of five warm runs from `pixi run bench` on this machine.
 Format reads use a warm filesystem page cache, equally for both implementations.
 
 | benchmark | mojo-meshio | reference | relative |
 | --- | ---: | ---: | ---: |
-| triangle normals (500k) | 12.29 ms | 160.10 ms (NumPy) | 13.03x faster |
-| indexed triangle gather (500k) | 6.94 ms | 51.99 ms (NumPy) | 7.49x faster |
-| binary STL read (150k triangles) | 60.13 ms | 777.97 ms (meshio) | 12.94x faster |
-| ASCII OFF read (150k triangles) | 102.20 ms | 1728.94 ms (meshio) | 16.92x faster |
+| triangle normals (500k) | 8.96 ms | 138.03 ms (NumPy) | 15.40x faster |
+| indexed triangle gather (500k) | 7.41 ms | 39.28 ms (NumPy) | 5.30x faster |
+| binary STL read (150k triangles) | 38.08 ms | 690.32 ms (meshio) | 18.13x faster |
+| ASCII OFF read (150k triangles) | 75.78 ms | 1575.47 ms (meshio) | 20.79x faster |
 
 The NumPy geometry references materialize advanced-indexing intermediates; the Mojo
 kernels stream through the indexed arrays once. The format results include parsing,
 allocation, and geometry reconstruction, not only kernel time.
 
-No GPU path is provided.
+Large indexed gathers are split into independent ranges above a 16,384-triangle
+threshold and dispatched to reusable worker threads. Each worker calls the SIMD Mojo
+kernel directly on the original NumPy buffers, without boundary copies.
+
+No GPU path is provided because none of the benchmarked kernels approaches the roughly
+2-flop-per-byte arithmetic intensity needed to amortize device transfers. Triangle
+gather is pure data movement, format parsing is branch-heavy, and normal computation is
+also bandwidth-bound; a GPU path would lose rather than help.
 
 Run the benchmark on the current machine with:
 

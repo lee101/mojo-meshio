@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+import os
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 
-from ._lib import address, as_f64_c, as_i64_c, ensure_parallel_runtime, lib
+from ._lib import address, as_f64_c, as_i64_c, lib
 
 _GATHER_PARALLEL_THRESHOLD = 16384
+_GATHER_WORKERS = min(os.cpu_count() or 1, 16)
+_gather_executor: ThreadPoolExecutor | None = None
+
+
+def _executor() -> ThreadPoolExecutor:
+    global _gather_executor
+    if _gather_executor is None:
+        _gather_executor = ThreadPoolExecutor(max_workers=_GATHER_WORKERS)
+    return _gather_executor
 
 
 def _geometry_inputs(points, cells, operation: str) -> tuple[np.ndarray, np.ndarray]:
@@ -53,7 +65,28 @@ def gather_triangles(points, cells) -> np.ndarray:
     p, c = _geometry_inputs(points, cells, "gather_triangles")
     storage = np.empty((max(len(c), 1), 3, 3), dtype=np.float64)
     result = storage[: len(c)]
-    if len(c) >= _GATHER_PARALLEL_THRESHOLD:
-        ensure_parallel_runtime()
-    lib().mmi_gather_triangles(address(p), address(c), address(result), len(c))
+    native = lib()
+    p_address = address(p)
+    c_address = address(c)
+    result_address = address(result)
+    if len(c) < _GATHER_PARALLEL_THRESHOLD or _GATHER_WORKERS == 1:
+        native.mmi_gather_triangles(p_address, c_address, result_address, len(c))
+        return result
+
+    chunk_size = (len(c) + _GATHER_WORKERS - 1) // _GATHER_WORKERS
+    futures = []
+    for start in range(0, len(c), chunk_size):
+        stop = min(start + chunk_size, len(c))
+        futures.append(
+            _executor().submit(
+                native.mmi_gather_triangles_range,
+                p_address,
+                c_address,
+                result_address,
+                start,
+                stop,
+            )
+        )
+    for future in futures:
+        future.result()
     return result

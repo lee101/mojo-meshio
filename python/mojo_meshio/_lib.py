@@ -19,9 +19,9 @@ _SIGNATURES = {
     "mmi_triangle_normals": ([I, I, I, I], I),
     "mmi_weld_triangles": ([I, I, I, I, I, I], I),
     "mmi_gather_triangles": ([I, I, I, I], None),
+    "mmi_gather_triangles_range": ([I, I, I, I, I], None),
 }
 _library: ctypes.CDLL | None = None
-_parallel_runtime = None
 
 
 def build() -> Path:
@@ -49,21 +49,6 @@ def lib() -> ctypes.CDLL:
             fn.argtypes = argtypes
             fn.restype = restype
     return _library
-
-
-def ensure_parallel_runtime() -> None:
-    global _parallel_runtime
-    if _parallel_runtime is None:
-        runtime = getattr(
-            lib(), "KGEN_CompilerRT_AsyncRT_GetOrCreateCPUDevice", False
-        )
-        if not runtime:
-            _parallel_runtime = False
-            return
-        runtime.argtypes = []
-        runtime.restype = ctypes.c_void_p
-        runtime()
-        _parallel_runtime = runtime
 
 
 def address(array: np.ndarray) -> int:
