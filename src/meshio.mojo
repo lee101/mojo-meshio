@@ -223,7 +223,7 @@ def gather_triangle_vertices(
     var vertex = start
     var vector_stop = stop - (stop - start) % W
     while vertex < vector_stop:
-        var offsets = cells.load[width=W](vertex) * Int64(3)
+        var offsets = cells.unsafe_load[width=W](vertex) * Int64(3)
         var x = points.gather(offsets)
         var y = points.gather(offsets + Int64(1))
         var z = points.gather(offsets + Int64(2))
